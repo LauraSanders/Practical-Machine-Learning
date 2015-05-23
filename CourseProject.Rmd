@@ -1,0 +1,71 @@
+---
+title: "How well do people perform their excersises?"
+author: "Laura"
+date: "Saterday, May 23, 2015"
+output: html_document
+---
+## Executive Summary 
+
+The goal of this project is to predict the manner in which the participants performed their exercises. The manner is shown in the classe variabel. There are 5 classes you can be in.
+
+## Data processing
+First we load in the data. The data used is from http://groupware.les.inf.puc-rio.br/har which we are very thankfull for being able to use this data.
+We have one training and one test set. The training set will be divided in a training and test set to make en test the model. The original test set will be used to test the model too and see what it predicts. 
+First we read in the data, get rid of the columns that contain NA and select only the columns that will be relevant for the prediction of how well people perform their exercises. We don't expect the user_name, new_window etc. to be relevant for the model. The classe is changed to a factor variable. We also set the seed to be able to replicate it.
+```{r,echo=TRUE}
+library(caret)
+# dowload the data using:
+# training<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+# download.file(training, destfile=".\\training.csv")
+# testing<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# download.file(testing, destfile=".\\testing.csv")
+training <- read.csv("training.csv", na.strings=c("NA", "#DIV/0!",","), stringsAsFactors = FALSE)
+testing <- read.csv("testing.csv", na.strings=c("NA", "#DIV/0!",","), stringsAsFactors = FALSE)
+
+training$classe <- as.factor(training$classe)
+training <- training[,colSums(is.na(training))==0]
+training <- training[,8:60]
+set.seed(100)
+inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+training_mod <- training[inTrain,]
+testing_mod <- training[-inTrain,]
+
+str(training_mod)
+dim(training_mod)
+dim(testing_mod)
+dim(testing)
+```
+
+## Exploratory Data Analysis
+First we short take a look at the total_accel_dumbbell vs the total_accel_forearm variable.
+As you can see in the plot below most belong to classe E while for example class A is more present in the lower values of total_accel_forearm. 
+```{r, echo=TRUE}
+qplot(total_accel_dumbbell,total_accel_forearm,colour=classe,data=training_mod)
+```
+
+
+
+## Data Modelling
+To predict the classe based on the other variables we create a model using the Random Forest Model. This type model is chosen because it's quite accurate. That you can also see in the Confusion Matrix. You see the accuracy of this model on the set on which the model is created is 1 which is logical.
+```{r,echo=TRUE}
+library(randomForest)
+modelfit <- randomForest(classe~., data=training_mod)
+predictmodel <- predict(modelfit, training_mod)
+confusionMatrix(training_mod$classe, predictmodel)
+```
+
+## Cross validation
+Because the model can be very different on the testing_mod data set we do a cross validation on that dataset. 
+You can see that the Accuracy is 0.9975. There are a few points that are not shown in the correct classe. In the plot below you can see where these points are in the data. Because only a few records haven't been correctly classified the out of sample error isn't that big.
+```{r,echo=TRUE}
+predictmodeltest <- predict(modelfit, testing_mod)
+confusionMatrix(testing_mod$classe, predictmodeltest)
+
+testing_mod$predright<-predictmodeltest==testing_mod$classe
+qplot(total_accel_dumbbell,total_accel_forearm,colour=predright,data=testing_mod)
+```
+
+
+## Conclusion
+
+We have built a model to predict the classe. We estimate the out of sample error to be .6% (1 - testing accuracy). This is a good result as it is close to 0. Of course in this model only the variables collected are taken into consideration while other factor like type of work, having children are not taken into account. So on a new data set the out of sample error may be higher.
